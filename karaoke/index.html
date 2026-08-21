@@ -1,0 +1,1506 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Караоке из своих видео и музыки: текст песни на экране, очередь и вывод на телевизор. Файлы остаются на вашем компьютере.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+<title>Караоке-сцена</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Golos+Text:wght@400;500;600;700&display=swap">
+
+</head>
+<body>
+<style>
+/* Приложение сознательно живёт в одном тёмном мире — это сцена, а не документ.
+   Поэтому все цвета заданы явно и не зависят от темы зрителя. */
+:root {
+  --ink:      #0D0A14;
+  --ink-2:    #16111F;
+  --ink-3:    #1F1829;
+  --ink-4:    #291F36;
+  --line:     #322740;
+  --text:     #F3EDFA;
+  --muted:    #A091B6;
+  --amber:    #FFB23A;
+  --magenta:  #FF2E6C;
+  --mint:     #4BE0A8;
+  --shadow:   0 24px 60px -20px #00000099;
+  --r:        18px;
+  --display:  'Unbounded', 'Golos Text', system-ui, sans-serif;
+  --body:     'Golos Text', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 520px at 12% -8%, #3A1B47 0%, transparent 62%),
+    radial-gradient(900px 460px at 92% -4%, #4A2317 0%, transparent 58%),
+    var(--ink);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input { font-family: inherit; font-size: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- каркас ---------- */
+.wrap { max-width: 1240px; margin: 0 auto; padding: 26px 20px 190px; }
+
+.masthead { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 24px; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand h1 {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 27px;
+  letter-spacing: -.02em;
+  margin: 0;
+  background: linear-gradient(96deg, var(--amber), var(--magenta) 78%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.brand .sub { color: var(--muted); font-size: 13px; }
+.grow { flex: 1; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 500;
+  padding: 7px 13px; border-radius: 999px;
+  border: 1px solid var(--line); background: #ffffff08; color: var(--muted);
+  white-space: nowrap;
+}
+.chip .led { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.chip.on { color: var(--mint); border-color: #2A5E48; }
+.chip.on .led { background: var(--mint); box-shadow: 0 0 10px var(--mint); }
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 500;
+  transition: background .15s, border-color .15s, transform .08s;
+}
+.btn:hover { background: var(--ink-4); border-color: #443457; }
+.btn:active { transform: translateY(1px); }
+.btn.hero {
+  background: linear-gradient(96deg, var(--amber), var(--magenta) 130%);
+  color: #1A0E05; border-color: transparent; font-weight: 700;
+}
+.btn.hero:hover { filter: brightness(1.07); background: linear-gradient(96deg, var(--amber), var(--magenta) 130%); }
+.btn.quiet { background: transparent; }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn.sm { padding: 7px 11px; border-radius: 10px; font-size: 13px; }
+
+/* ---------- колонки ---------- */
+.cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 20px; }
+.card > header {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px;
+}
+.card > header h2 {
+  margin: 0; font-family: var(--display); font-weight: 500;
+  font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+}
+.count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- зона загрузки ---------- */
+.drop {
+  border: 1.5px dashed #4A3A5E;
+  border-radius: 14px;
+  padding: 26px 18px;
+  text-align: center;
+  color: var(--muted);
+  transition: border-color .15s, background .15s, color .15s;
+  cursor: pointer;
+}
+.drop:hover, .drop.over { border-color: var(--amber); background: #FFB23A0F; color: var(--text); }
+.drop b { display: block; color: var(--text); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.drop small { display: block; margin-top: 7px; font-size: 12.5px; line-height: 1.55; }
+body.dragging .drop { border-color: var(--amber); background: #FFB23A14; }
+
+/* ---------- списки ---------- */
+.search {
+  width: 100%; margin: 14px 0 10px;
+  background: var(--ink-3); border: 1px solid var(--line);
+  border-radius: 11px; padding: 10px 13px;
+}
+.search::placeholder { color: #7C6E92; }
+
+.rows { display: flex; flex-direction: column; gap: 6px; max-height: 44vh; overflow-y: auto; }
+.rows::-webkit-scrollbar { width: 8px; }
+.rows::-webkit-scrollbar-thumb { background: #34293F; border-radius: 4px; }
+
+.row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px; border-radius: 12px;
+  background: var(--ink-3); border: 1px solid transparent;
+}
+.row:hover { border-color: #3E3050; }
+.row.live { border-color: var(--amber); background: #FFB23A12; }
+.row .meta { flex: 1; min-width: 0; }
+.row .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.row .sm { font-size: 12px; color: var(--muted); display: flex; gap: 7px; align-items: center; font-variant-numeric: tabular-nums; }
+.row .ord {
+  width: 22px; text-align: center; color: var(--muted);
+  font-family: var(--display); font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.iconbtn {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line); background: var(--ink-2);
+  font-size: 14px; line-height: 1; flex: none;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.iconbtn:hover { background: var(--ink-4); border-color: #4A3A5E; }
+.iconbtn.warm:hover { color: var(--amber); border-color: #6A4A1E; }
+.iconbtn.cold:hover { color: var(--magenta); border-color: #6A1E38; }
+.tag {
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+}
+.tag.saved { color: var(--mint); border-color: #2A5E48; }
+.blank { color: var(--muted); font-size: 14px; padding: 18px 4px; text-align: center; }
+.blank b { color: var(--text); display: block; font-weight: 600; margin-bottom: 3px; }
+
+/* имя поющего */
+.singer { display: flex; align-items: center; gap: 6px; }
+.singer input {
+  width: 96px; background: var(--ink-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 4px 8px; font-size: 12px;
+}
+
+/* ---------- экран ---------- */
+#stage { position: relative; }
+#stage.card-mode {
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+#stage.full-mode {
+  position: fixed; inset: 0; z-index: 90;
+  background: #000; border-radius: 0; border: 0; aspect-ratio: auto;
+}
+#video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+
+#idle {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  background: radial-gradient(720px 460px at 50% 42%, #3A1B47 0%, #0B0810 74%);
+  padding: 22px;
+}
+#idle.gone { display: none; }
+#idle .mark {
+  font-family: var(--display); font-weight: 900;
+  font-size: clamp(30px, 7vw, 108px); letter-spacing: -.03em; line-height: 1;
+  background: linear-gradient(96deg, var(--amber), var(--magenta) 72%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#idle p { color: var(--muted); margin: 12px 0 0; font-size: clamp(12px, 1.4vw, 17px); }
+
+.full-mode #idle .mark { font-size: clamp(46px, 11vw, 170px); }
+
+#nextup {
+  position: absolute; right: 20px; top: 18px; z-index: 3;
+  background: #0D0A14C7; border: 1px solid #FFFFFF1F; border-radius: 14px;
+  padding: 10px 16px; backdrop-filter: blur(10px); max-width: 42%;
+}
+#nextup.gone { display: none; }
+#nextup .lbl {
+  font-family: var(--display); font-size: 10px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--amber);
+}
+#nextup .who { font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.full-mode #nextup { right: 3vw; top: 4vh; padding: 14px 22px; }
+.full-mode #nextup .who { font-size: clamp(15px, 1.7vw, 25px); }
+
+#toast {
+  position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+  z-index: 3; background: #0D0A14CC; border: 1px solid #FFFFFF1F;
+  padding: 11px 22px; border-radius: 999px; backdrop-filter: blur(10px);
+  font-weight: 600; white-space: nowrap; max-width: 86%; overflow: hidden; text-overflow: ellipsis;
+  transition: opacity .35s;
+}
+#toast.gone { opacity: 0; pointer-events: none; }
+.full-mode #toast { bottom: 9vh; font-size: clamp(15px, 2vw, 26px); padding: 14px 30px; }
+
+#stagebar {
+  position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%);
+  z-index: 4; display: none; gap: 8px; align-items: center;
+  background: #0D0A14D9; border: 1px solid #FFFFFF1F; border-radius: 999px;
+  padding: 9px 12px; backdrop-filter: blur(12px);
+  transition: opacity .3s;
+}
+.full-mode #stagebar { display: flex; }
+.full-mode.hidechrome #stagebar, .full-mode.hidechrome #nextup { opacity: 0; pointer-events: none; }
+.full-mode.hidechrome { cursor: none; }
+
+/* ---------- нижняя панель ---------- */
+.deck {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  background: #100C19F2; border-top: 1px solid var(--line);
+  backdrop-filter: blur(16px);
+  padding: 13px 20px 16px;
+}
+.deck .inner { max-width: 1240px; margin: 0 auto; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.nowline { flex: 1 1 230px; min-width: 0; }
+.nowline .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nowline .s { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nowline .s.alert { color: var(--amber); }
+
+.transport { display: flex; align-items: center; gap: 8px; }
+.play {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: linear-gradient(96deg, var(--amber), var(--magenta) 135%);
+  color: #1A0E05; display: grid; place-items: center;
+  font-size: 17px; transition: transform .08s, filter .15s;
+}
+.play:hover { filter: brightness(1.07); }
+.play:active { transform: scale(.96); }
+
+.scrub { flex: 1 1 260px; display: flex; align-items: center; gap: 11px; }
+.tt { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 40px; }
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 5px; border-radius: 99px; background: #33283F; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--amber); border: 2px solid #150F1E;
+}
+input[type=range]::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%; background: var(--amber); border: 2px solid #150F1E;
+}
+.vol { display: flex; align-items: center; gap: 9px; width: 150px; }
+
+/* ---------- помощь ---------- */
+.help { margin-top: 20px; }
+.help summary {
+  cursor: pointer; color: var(--muted); font-size: 13.5px;
+  padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: #ffffff06;
+  list-style: none;
+}
+.help summary::-webkit-details-marker { display: none; }
+.help summary:hover { color: var(--text); }
+.help[open] summary { border-radius: 12px 12px 0 0; border-bottom-color: transparent; }
+.help .body {
+  border: 1px solid var(--line); border-top: 0; border-radius: 0 0 12px 12px;
+  padding: 4px 18px 16px; background: #ffffff04;
+}
+.help h3 {
+  font-family: var(--display); font-size: 12px; font-weight: 500; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--amber); margin: 18px 0 6px;
+}
+.help p { margin: 0 0 8px; color: #CFC4DE; max-width: 62ch; font-size: 14px; }
+.help kbd {
+  font-family: var(--body); font-size: 12px; font-weight: 600;
+  background: var(--ink-4); border: 1px solid var(--line); border-bottom-width: 2px;
+  padding: 1px 7px; border-radius: 6px;
+}
+
+
+/* ---------- сцена с текстом песни ---------- */
+#lyricstage {
+  position: absolute; inset: 0; z-index: 2;
+  display: none; flex-direction: column; justify-content: center; align-items: center;
+  gap: 2.2vh; padding: 4% 6%; text-align: center;
+  background: radial-gradient(900px 620px at 50% 38%, #3A1B47 0%, #0B0810 76%);
+}
+#lyricstage.shown { display: flex; }
+#lyricstage .song {
+  font-family: var(--display); font-weight: 700; letter-spacing: -.01em;
+  font-size: clamp(11px, 1.5vw, 20px); color: var(--amber);
+  text-transform: uppercase; letter-spacing: .14em;
+}
+.lyr-prev, .lyr-next { color: #8C7EA6; font-size: clamp(12px, 2vw, 26px); max-width: 92%; }
+.lyr-next { color: #A796C0; }
+.lyr-now {
+  --p: 0%;
+  font-weight: 700; max-width: 94%;
+  font-size: clamp(19px, 4.4vw, 62px); line-height: 1.16;
+  /* пропетая часть — тёплый градиент, непропетая — приглушённая.
+     Заливка живёт на самом тексте, поэтому перенос строк её не ломает. */
+  background-image: linear-gradient(90deg, var(--amber) 0%, var(--magenta) var(--p), #55496B var(--p), #55496B 100%);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+}
+.lyr-dots { display: flex; gap: 10px; height: 14px; align-items: center; }
+.lyr-dots i {
+  width: 11px; height: 11px; border-radius: 50%; background: #4A3D5E; display: block;
+  transition: background .12s, transform .12s;
+}
+.lyr-dots i.hot { background: var(--amber); transform: scale(1.25); }
+#lyricstage .hint { color: #7E7196; font-size: clamp(11px, 1.3vw, 16px); }
+
+/* ---------- панель текста ---------- */
+.sheet {
+  position: fixed; inset: 0; z-index: 120; display: none;
+  background: #07050Cd9; backdrop-filter: blur(6px);
+  padding: 4vh 16px; overflow-y: auto;
+}
+.sheet.shown { display: block; }
+.sheet .box {
+  max-width: 720px; margin: 0 auto; background: var(--ink-2);
+  border: 1px solid var(--line); border-radius: var(--r); padding: 22px; box-shadow: var(--shadow);
+}
+.sheet h3 {
+  font-family: var(--display); font-weight: 700; font-size: 17px; margin: 0 0 4px;
+}
+.sheet .who { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+.sheet textarea {
+  width: 100%; min-height: 210px; resize: vertical;
+  background: var(--ink-3); border: 1px solid var(--line); border-radius: 12px;
+  padding: 13px; color: var(--text); font-family: var(--body); font-size: 14px; line-height: 1.6;
+}
+.sheet .actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+.sheet .note { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin: 12px 0 0; }
+.sheet .note b { color: var(--text); }
+
+/* разметка по музыке */
+.marker { display: none; }
+.marker.shown { display: block; }
+.marker .now {
+  background: var(--ink-3); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px; margin-top: 14px; text-align: center;
+}
+.marker .now .line { font-size: 19px; font-weight: 600; min-height: 26px; }
+.marker .now .after { color: var(--muted); font-size: 13px; margin-top: 6px; min-height: 18px; }
+.marker .bignote { color: var(--amber); font-size: 13px; margin-top: 10px; }
+.marker .tapbtn {
+  width: 100%; margin-top: 12px; padding: 18px; border-radius: 14px;
+  background: linear-gradient(96deg, var(--amber), var(--magenta) 130%);
+  color: #1A0E05; font-weight: 700; font-size: 16px;
+}
+.marker .progress { color: var(--muted); font-size: 12px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+
+/* приглушение вокала */
+.vocal { display: flex; align-items: center; gap: 9px; width: 168px; }
+.vocal .lbl { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.vocal input[type=range] { accent-color: var(--magenta); }
+.row .tag.lyr { color: var(--amber); border-color: #6A4A1E; }
+
+@media (max-width: 620px) {
+  .wrap { padding: 18px 13px 232px; }
+  /* второе окно — история про ноутбук с HDMI, на телефоне оно только мешает */
+  #tvBtn, #tvChip { display: none; }
+  .masthead { flex-wrap: nowrap; gap: 10px; }
+  .brand { flex-direction: column; gap: 0; }
+  .brand h1 { font-size: 22px; }
+  .brand .sub { font-size: 11.5px; }
+  .drop { padding: 18px 14px; }
+  .drop small { display: none; }
+  .deck { padding: 10px 13px 13px; }
+  .deck .inner { gap: 9px; row-gap: 7px; }
+  .nowline { flex: 1 1 100%; }
+  .transport { width: 100%; justify-content: space-between; gap: 5px; }
+  .scrub { flex: 1 1 100%; order: 5; }
+  .vol { width: 100%; order: 6; }
+  .vocal { width: 100%; order: 7; }
+  .play { width: 46px; height: 46px; }
+  .rows { max-height: 40vh; }
+}
+</style>
+
+<div class="wrap" id="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <h1>КАРАОКЕ</h1>
+      <span class="sub">ваши видеофайлы · ничего не загружается в интернет</span>
+    </div>
+    <span class="grow"></span>
+    <span class="chip" id="tvChip"><span class="led"></span><span id="tvChipText">Телевизор не подключён</span></span>
+    <button class="btn quiet" id="tvBtn">Открыть на телевизоре</button>
+    <button class="btn hero" id="stageBtn">Во весь экран</button>
+  </header>
+
+  <div class="cols">
+    <div>
+      <section class="card">
+        <header><h2>Фонотека</h2><span class="grow"></span><span class="count" id="libCount"></span>
+          <button class="iconbtn cold" id="wipeBtn" title="Очистить фонотеку">✕</button>
+        </header>
+        <div class="drop" id="drop">
+          <b>Перетащите видео или музыку сюда</b>
+          нажмите, чтобы выбрать на компьютере
+          <small>видео mp4, webm, mov · музыка mp3, m4a, wav · файлы остаются у вас, приложение только проигрывает их<br>к музыке добавьте текст песни кнопкой ♪ — или перетащите сюда .lrc-файл</small>
+        </div>
+        <input type="file" id="picker" accept="video/*,audio/*,.lrc,.txt" multiple hidden>
+        <input class="search" id="search" placeholder="Поиск по названию…">
+        <div class="rows" id="library"></div>
+      </section>
+    </div>
+
+    <div>
+      <section class="card" style="padding:0;overflow:hidden;border:0;background:none;box-shadow:none">
+        <div id="stage" class="card-mode">
+          <video id="video" playsinline preload="auto" x-webkit-airplay="allow"></video>
+          <div id="idle">
+            <div>
+              <div class="mark">КАРАОКЕ</div>
+              <p id="idleHint">Добавьте видео слева и нажмите ▶</p>
+            </div>
+          </div>
+          <div id="lyricstage">
+            <div class="song" id="lyrSong"></div>
+            <div class="lyr-dots" id="lyrDots"><i></i><i></i><i></i><i></i></div>
+            <div class="lyr-prev" id="lyrPrev"></div>
+            <div class="lyr-now" id="lyrNow"><span id="lyrText"></span></div>
+            <div class="lyr-next" id="lyrNext"></div>
+            <div class="hint" id="lyrHint"></div>
+          </div>
+          <div id="nextup" class="gone"><div class="lbl">Следующая</div><div class="who" id="nextName"></div></div>
+          <div id="toast" class="gone"></div>
+          <div id="stagebar">
+            <button class="iconbtn" data-act="prevnudge" title="−10 секунд">⏪</button>
+            <button class="iconbtn" data-act="toggle" title="Пауза / продолжить">❚❚</button>
+            <button class="iconbtn" data-act="nextnudge" title="+10 секунд">⏩</button>
+            <button class="iconbtn" data-act="next" title="Следующая песня">⏭</button>
+            <button class="btn sm" data-act="exit">Выйти из полного экрана</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <header><h2>Очередь</h2><span class="grow"></span>
+          <button class="iconbtn warm" id="shuffleBtn" title="Перемешать">⇄</button>
+          <button class="iconbtn cold" id="clearBtn" title="Очистить очередь">✕</button>
+        </header>
+        <div class="rows" id="queue" style="max-height:38vh"></div>
+      </section>
+    </div>
+  </div>
+
+  <details class="help">
+    <summary>Как вывести на большой экран и что нажимать →</summary>
+    <div class="body">
+      <h3>Телевизор по кабелю HDMI</h3>
+      <p>Подключите ноутбук к телевизору, нажмите <b>«Открыть на телевизоре»</b> — откроется второе окно.
+      Перетащите его на экран телевизора и нажмите в нём на видео: оно развернётся во весь экран.
+      Пультом остаётся первое окно; звук идёт на телевизор.</p>
+
+      <h3>Одно окно на проекторе</h3>
+      <p>Если второе окно не нужно — нажмите <b>«Во весь экран»</b> и переключите вывод на телевизор.
+      Управление вылезает при движении мышью.</p>
+
+      <h3>Chromecast и AirPlay</h3>
+      <p>Chrome: меню <b>⋮ → Трансляция → Транслировать вкладку</b> и выберите телевизор.
+      Safari на Mac: значок AirPlay в окне видео. Так как файл лежит у вас на компьютере,
+      телевизор получает картинку именно через трансляцию вкладки.</p>
+
+      <h3>Клавиши</h3>
+      <p><kbd>пробел</kbd> — пауза · <kbd>→</kbd> <kbd>←</kbd> — перемотка на 5 секунд ·
+      <kbd>N</kbd> — следующая песня · <kbd>F</kbd> — во весь экран · <kbd>Esc</kbd> — выйти.</p>
+
+      <h3>Сохранение между запусками</h3>
+      <p>Небольшие файлы приложение запоминает в браузере — при следующем открытии ссылки
+      фонотека будет на месте. Файлы тяжелее 500 МБ остаются только на текущий вечер:
+      после перезагрузки страницы добавьте их снова.</p>
+    </div>
+  </details>
+</div>
+
+<div class="sheet" id="sheet">
+  <div class="box">
+    <h3 id="sheetTitle">Текст песни</h3>
+    <div class="who" id="sheetWho"></div>
+
+    <div id="sheetEdit">
+      <textarea id="lyricsBox" placeholder="Вставьте текст песни — каждая строка с новой строки.&#10;&#10;Можно вставить и .lrc-текст с метками времени вида [00:24.10] — тогда разметка не нужна."></textarea>
+      <div class="actions">
+        <button class="btn hero" id="saveLyrics">Сохранить текст</button>
+        <button class="btn" id="startMark">Разметить по музыке</button>
+        <button class="btn quiet" id="dropLyrics">Удалить текст</button>
+        <span class="grow"></span>
+        <button class="btn quiet" id="closeSheet">Закрыть</button>
+      </div>
+      <p class="note">
+        <b>Откуда взять текст.</b> Скопируйте его из источника, которым пользуетесь, и вставьте сюда.
+        Если рядом с песней лежит файл <b>.lrc</b> — просто перетащите его на страницу, метки времени
+        подхватятся сами и размечать ничего не придётся.
+      </p>
+    </div>
+
+    <div class="marker" id="marker">
+      <div class="now">
+        <div class="line" id="markLine"></div>
+        <div class="after" id="markAfter"></div>
+      </div>
+      <button class="tapbtn" id="tapBtn">Нажмите в начале строки&nbsp;&nbsp;·&nbsp;&nbsp;или пробел</button>
+      <div class="progress" id="markProgress"></div>
+      <div class="bignote">Песня играет. Отмечайте каждую строку в тот момент, когда её начинают петь.</div>
+      <div class="actions">
+        <button class="btn" id="undoMark">← Отменить строку</button>
+        <button class="btn hero" id="finishMark">Готово, сохранить</button>
+        <button class="btn quiet" id="cancelMark">Отмена</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="deck">
+  <div class="inner">
+    <div class="nowline">
+      <div class="t" id="nowTitle">Тишина</div>
+      <div class="s" id="nowSub">Добавьте видео, чтобы начать</div>
+    </div>
+    <div class="transport">
+      <button class="iconbtn" id="b10" title="−10 секунд">⏪</button>
+      <button class="play" id="playBtn" title="Играть">▶</button>
+      <button class="iconbtn" id="f10" title="+10 секунд">⏩</button>
+      <button class="iconbtn" id="nextBtn" title="Следующая">⏭</button>
+      <button class="iconbtn" id="againBtn" title="Спеть заново">↺</button>
+    </div>
+    <div class="scrub">
+      <span class="tt" id="tNow">0:00</span>
+      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Перемотка">
+      <span class="tt" id="tEnd">0:00</span>
+    </div>
+    <div class="vol">
+      <button class="iconbtn" id="muteBtn" title="Звук">◂))</button>
+      <input type="range" id="vol" min="0" max="100" value="100" aria-label="Громкость">
+    </div>
+    <div class="vocal">
+      <span class="lbl">минус вокал</span>
+      <input type="range" id="vocal" min="0" max="100" value="0" aria-label="Приглушение вокала" title="Приглушает голос в оригинальной записи">
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   Караоке целиком в браузере.
+   Видеофайлы никуда не отправляются: они читаются через File API,
+   небольшие сохраняются в IndexedDB, чтобы фонотека пережила перезагрузку.
+   Второе окно (телевизор) синхронизируется через BroadcastChannel.
+   ===================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const PERSIST_LIMIT = 500 * 1024 * 1024;
+const isTV = location.hash === '#tv';
+
+/* ---------- мелкие утилиты ---------- */
+const clock = (s) => {
+  s = Math.max(0, Math.floor(s || 0));
+  const m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
+};
+const weigh = (b) => b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' КБ'
+  : b < 1073741824 ? (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' МБ'
+  : (b / 1073741824).toFixed(1) + ' ГБ';
+const nameToTitle = (n) => n.replace(/\.[^.]+$/, '')
+  .replace(/[_.]+/g, ' ')
+  .replace(/\s*\((?:official|lyrics?|karaoke|hd|4k|full)[^)]*\)/gi, ' ')
+  .replace(/\s*\[[^\]]*\]/g, ' ')
+  .replace(/\s{2,}/g, ' ').trim() || n;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+/* ---------- хранилище ---------- */
+const DB = { name: 'karaoke-lib', store: 'tracks', lyr: 'lyrics', ref: null };
+function db() {
+  if (DB.ref) return DB.ref;
+  DB.ref = new Promise((res, rej) => {
+    let rq;
+    try { rq = indexedDB.open(DB.name, 2); } catch (e) { return rej(e); }
+    rq.onupgradeneeded = () => {
+      if (!rq.result.objectStoreNames.contains(DB.store)) rq.result.createObjectStore(DB.store, { keyPath: 'id' });
+      if (!rq.result.objectStoreNames.contains(DB.lyr)) rq.result.createObjectStore(DB.lyr, { keyPath: 'id' });
+    };
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  }).catch(() => null);
+  return DB.ref;
+}
+async function dbAll() {
+  const d = await db(); if (!d) return [];
+  return new Promise((res) => {
+    try {
+      const rq = d.transaction(DB.store, 'readonly').objectStore(DB.store).getAll();
+      rq.onsuccess = () => res(rq.result || []);
+      rq.onerror = () => res([]);
+    } catch (e) { res([]); }
+  });
+}
+async function dbPut(rec, store) {
+  const d = await db(); if (!d) return false;
+  store = store || DB.store;
+  return new Promise((res) => {
+    try {
+      const tx = d.transaction(store, 'readwrite');
+      tx.objectStore(store).put(rec);
+      tx.oncomplete = () => res(true);
+      tx.onerror = tx.onabort = () => res(false);
+    } catch (e) { res(false); }
+  });
+}
+async function dbDel(id, store) {
+  const d = await db(); if (!d) return;
+  store = store || DB.store;
+  try { d.transaction(store, 'readwrite').objectStore(store).delete(id); } catch (e) {}
+}
+async function dbGet(id, store) {
+  const d = await db(); if (!d) return null;
+  store = store || DB.store;
+  return new Promise((res) => {
+    try {
+      const rq = d.transaction(store, 'readonly').objectStore(store).get(id);
+      rq.onsuccess = () => res(rq.result || null);
+      rq.onerror = () => res(null);
+    } catch (e) { res(null); }
+  });
+}
+
+/* ---------- состояние ---------- */
+const blobs = new Map();   // id -> Blob (в памяти на эту сессию)
+const urls = new Map();    // id -> objectURL
+let library = [];          // [{id,title,size,saved,duration}]
+let queue = [];            // [{qid,id,singer}]
+let currentId = null;
+let filter = '';
+let scrubbing = false;
+let tvOpen = false;        // играет второе окно (телевизор)
+let remote = { time: 0, duration: 0 };
+
+const video = $('video');
+const stage = $('stage');
+const chan = ('BroadcastChannel' in window) ? new BroadcastChannel('karaoke-room') : null;
+
+const trackOf = (id) => library.find((t) => t.id === id) || null;
+
+async function urlFor(id) {
+  if (urls.has(id)) return urls.get(id);
+  let blob = blobs.get(id);
+  if (!blob) { const rec = await dbGet(id); if (rec && rec.blob) { blob = rec.blob; blobs.set(id, blob); } }
+  if (!blob) return null;
+  const u = URL.createObjectURL(blob);
+  urls.set(id, u);
+  return u;
+}
+
+/* ---------- добавление файлов ---------- */
+const isAudio = (f) => /^audio\//.test(f.type) || /\.(mp3|m4a|aac|wav|flac|oga|opus)$/i.test(f.name);
+const isVideo = (f) => /^video\//.test(f.type) || /\.(mp4|m4v|webm|mov|ogv|mkv|avi)$/i.test(f.name);
+const isText  = (f) => /\.(lrc|txt)$/i.test(f.name);
+
+async function addFiles(files) {
+  const all = [...files].filter((f) => f.size > 0);
+  const texts = all.filter(isText);
+  for (const f of texts) await attachTextFile(f);
+
+  const vids = all.filter((f) => isAudio(f) || isVideo(f));
+  if (!vids.length) {
+    if (all.length && !texts.length) flash('Это не музыка и не видео — нужны mp4, webm, mp3 или m4a');
+    return;
+  }
+  for (const f of vids) {
+    const id = uid();
+    const rec = { id, title: nameToTitle(f.name), name: f.name, size: f.size, saved: false, duration: 0, audio: isAudio(f) };
+    blobs.set(id, f);
+    if (f.size <= PERSIST_LIMIT) rec.saved = await dbPut({ id, title: rec.title, name: f.name, size: f.size, blob: f, audio: rec.audio, addedAt: Date.now() });
+    library.push(rec);
+    measure(rec);
+  }
+  library.sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+  drawLibrary();
+  flash(vids.length === 1 ? 'Добавлено: ' + nameToTitle(vids[0].name) : 'Добавлено песен: ' + vids.length);
+  const firstAudio = vids.find(isAudio);
+  if (firstAudio) setTimeout(() => flash('Это музыка без видео — добавьте к ней текст песни кнопкой ♪', 6000), 3600);
+  if (!currentId && !queue.length) drawDeck();
+}
+
+/* длительность — читаем скрытым видеоэлементом, чтобы показать её в списке */
+async function measure(rec) {
+  const u = await urlFor(rec.id); if (!u) return;
+  const probe = document.createElement('video');
+  probe.preload = 'metadata';
+  let settled = false;
+  probe.onloadedmetadata = () => {
+    settled = true;
+    if (isFinite(probe.duration)) { rec.duration = probe.duration; drawLibrary(); }
+  };
+  probe.onerror = () => { if (settled) return; rec.broken = true; drawLibrary(); };
+  probe.src = u;
+}
+
+async function loadSaved() {
+  const recs = await dbAll();
+  if (!recs.length) return;
+  for (const r of recs) {
+    if (library.some((t) => t.id === r.id)) continue;
+    blobs.set(r.id, r.blob);
+    const rec = { id: r.id, title: r.title || nameToTitle(r.name || ''), name: r.name, size: r.size, saved: true, duration: 0, audio: !!r.audio };
+    library.push(rec);
+    measure(rec);
+    loadLyrics(r.id);
+  }
+  library.sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+  drawLibrary();
+}
+
+/* ---------- отрисовка ---------- */
+function drawLibrary() {
+  const box = $('library');
+  const q = filter.trim().toLowerCase();
+  const list = library.filter((t) => !q || t.title.toLowerCase().includes(q));
+  $('libCount').textContent = library.length ? library.length + ' песен' : '';
+
+  if (!list.length) {
+    box.innerHTML = library.length
+      ? '<div class="blank">Ничего не нашлось по запросу.</div>'
+      : '<div class="blank"><b>Пока пусто</b>Перетащите сюда скачанные караоке-видео.</div>';
+    return;
+  }
+  box.innerHTML = list.map((t) => `
+    <div class="row ${t.id === currentId ? 'live' : ''}">
+      <div class="meta">
+        <div class="nm">${esc(t.title)}</div>
+        <div class="sm">
+          ${t.audio ? 'музыка · ' : ''}${t.duration ? clock(t.duration) + ' · ' : ''}${weigh(t.size)}
+          <span class="tag ${t.saved ? 'saved' : ''}">${t.saved ? 'сохранено' : 'на этот вечер'}</span>
+          ${lyricsOf(t.id) ? '<span class="tag lyr">' + (lyricsOf(t.id).synced ? 'текст размечен' : 'текст без разметки') + '</span>' : ''}
+          ${t.broken ? '<span class="tag" style="color:var(--magenta)">формат не читается</span>' : ''}
+        </div>
+      </div>
+      <button class="iconbtn warm" data-lyr="${t.id}" title="Текст песни">♪</button>
+      <button class="iconbtn warm" data-play="${t.id}" title="Петь сейчас">▶</button>
+      <button class="iconbtn" data-add="${t.id}" title="В очередь">＋</button>
+      <button class="iconbtn cold" data-drop="${t.id}" title="Убрать из фонотеки">✕</button>
+    </div>`).join('');
+}
+
+function drawQueue() {
+  const box = $('queue');
+  if (!queue.length) {
+    box.innerHTML = '<div class="blank"><b>Очередь пуста</b>Нажмите ＋ у песни — и она встанет в очередь.</div>';
+  } else {
+    box.innerHTML = queue.map((q, i) => {
+      const t = trackOf(q.id);
+      return `<div class="row">
+        <div class="ord">${i + 1}</div>
+        <div class="meta">
+          <div class="nm">${esc(t ? t.title : 'песня удалена')}</div>
+          <div class="sm singer">
+            <input data-singer="${q.qid}" value="${esc(q.singer || '')}" placeholder="кто поёт" maxlength="24">
+          </div>
+        </div>
+        <button class="iconbtn" data-up="${q.qid}" title="Выше">↑</button>
+        <button class="iconbtn" data-down="${q.qid}" title="Ниже">↓</button>
+        <button class="iconbtn cold" data-rm="${q.qid}" title="Убрать">✕</button>
+      </div>`;
+    }).join('');
+  }
+  const nxt = queue[0];
+  if (nxt && currentId) {
+    const t = trackOf(nxt.id);
+    $('nextName').textContent = (t ? t.title : '') + (nxt.singer ? ' — ' + nxt.singer : '');
+    $('nextup').classList.remove('gone');
+  } else {
+    $('nextup').classList.add('gone');
+  }
+}
+
+function drawDeck() {
+  const t = trackOf(currentId);
+  const playing = !video.paused && !!currentId;
+  $('playBtn').textContent = playing ? '❚❚' : '▶';
+  $('playBtn').title = playing ? 'Пауза' : 'Играть';
+  const sb = document.querySelector('#stagebar [data-act="toggle"]');
+  if (sb) sb.textContent = playing ? '❚❚' : '▶';
+
+  if (t) {
+    $('nowTitle').textContent = t.title;
+    const nxt = queue[0];
+    const nt = nxt ? trackOf(nxt.id) : null;
+    $('nowSub').textContent = tvOpen
+      ? 'Идёт на телевизоре' + (nt ? ' · далее: ' + nt.title : '')
+      : (nt ? 'Далее: ' + nt.title + (nxt.singer ? ' (' + nxt.singer + ')' : '') : 'Последняя песня в очереди');
+    $('nowSub').classList.toggle('alert', tvOpen);
+    $('idle').classList.add('gone');
+  } else {
+    $('nowTitle').textContent = 'Тишина';
+    $('nowSub').textContent = library.length ? 'Выберите песню в фонотеке' : 'Добавьте видео, чтобы начать';
+    $('nowSub').classList.remove('alert');
+    $('idle').classList.remove('gone');
+    $('idleHint').textContent = library.length ? 'Выберите песню слева и нажмите ▶' : 'Добавьте музыку или видео слева и нажмите ▶';
+  }
+  drawStage();
+  drawTime();
+}
+
+function drawTime() {
+  const d = tvOpen ? remote.duration : (isFinite(video.duration) ? video.duration : 0);
+  const c = tvOpen ? remote.time : video.currentTime;
+  $('tEnd').textContent = clock(d);
+  $('tNow').textContent = clock(c);
+  if (!scrubbing) $('seek').value = d ? Math.round((c / d) * 1000) : 0;
+}
+
+let flashTimer = null;
+function flash(text, ms = 3000) {
+  $('toast').textContent = text;
+  $('toast').classList.remove('gone');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => $('toast').classList.add('gone'), ms);
+}
+
+/* ---------- воспроизведение ---------- */
+async function play(id, { at = 0 } = {}) {
+  const t = trackOf(id);
+  if (!t) return;
+  const u = await urlFor(id);
+  if (!u) { flash('Файл больше недоступен — добавьте его заново', 5000); return; }
+  currentId = id;
+  video.src = u;
+  video.currentTime = 0;
+  if (at) video.addEventListener('loadedmetadata', () => { try { video.currentTime = at; } catch (e) {} }, { once: true });
+  if (!tvOpen) {
+    video.play().catch(() => flash('Нажмите ▶ ещё раз — браузер просит разрешение', 5000));
+  } else {
+    video.pause();
+  }
+  const singer = (queue.justPlayed && queue.justPlayed.singer) || '';
+  flash('🎤 ' + t.title + (singer ? ' — поёт ' + singer : ''), 4200);
+  drawLibrary(); drawQueue(); drawDeck();
+  push({ kind: 'load', id, title: t.title, at, playing: true, singer, audio: !!t.audio, lyrics: lyricsOf(id) });
+}
+
+function pushLyrics() {
+  const t = trackOf(currentId);
+  if (t) push({ kind: 'lyrics', id: currentId, title: t.title, audio: !!t.audio, lyrics: lyricsOf(currentId) });
+}
+
+function advance() {
+  const nxt = queue.shift();
+  if (!nxt) { stopAll(); return; }
+  queue.justPlayed = nxt;
+  drawQueue();
+  play(nxt.id);
+}
+
+function stopAll() {
+  currentId = null;
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+  remote = { time: 0, duration: 0 };
+  drawLibrary(); drawQueue(); drawDeck();
+  push({ kind: 'stop' });
+}
+
+function toggle() {
+  if (!currentId) { if (queue.length) advance(); else if (library.length) play(library[0].id); return; }
+  if (tvOpen) { push({ kind: 'toggle' }); return; }
+  if (video.paused) video.play().catch(() => {}); else video.pause();
+  drawDeck();
+}
+
+function nudge(delta) {
+  if (!currentId) return;
+  if (tvOpen) { push({ kind: 'seek', time: Math.max(0, remote.time + delta) }); return; }
+  video.currentTime = Math.max(0, Math.min((video.duration || 0), video.currentTime + delta));
+}
+
+function seekTo(time) {
+  if (!currentId) return;
+  if (tvOpen) { push({ kind: 'seek', time }); remote.time = time; drawTime(); return; }
+  try { video.currentTime = time; } catch (e) {}
+}
+
+/* ---------- связь со вторым окном ---------- */
+function push(msg) { if (chan) { try { chan.postMessage(msg); } catch (e) {} } }
+
+if (chan && !isTV) {
+  chan.onmessage = async (e) => {
+    const m = e.data || {};
+    if (m.kind === 'tv-hello') {
+      setTV(true);
+      const t = trackOf(currentId);
+      const at = video.currentTime || 0;
+      video.pause();
+      push({ kind: 'load', id: currentId, title: t ? t.title : '', at, playing: !!currentId,
+             blob: currentId ? blobs.get(currentId) : null, audio: t ? !!t.audio : false, lyrics: currentId ? lyricsOf(currentId) : null });
+      push({ kind: 'volume', value: video.volume, muted: video.muted });
+      push({ kind: 'vocal', value: ($('vocal').value || 0) / 100 });
+    } else if (m.kind === 'tv-bye') {
+      setTV(false);
+      if (currentId) { try { video.currentTime = remote.time || 0; } catch (er) {} video.play().catch(() => {}); }
+      drawDeck();
+    } else if (m.kind === 'tv-progress') {
+      remote = { time: m.time || 0, duration: m.duration || 0 };
+      drawTime();
+    } else if (m.kind === 'tv-ended') {
+      advance();
+    } else if (m.kind === 'tv-need-blob') {
+      push({ kind: 'blob', id: m.id, blob: blobs.get(m.id) || null });
+    } else if (m.kind === 'tv-state') {
+      $('playBtn').textContent = m.playing ? '❚❚' : '▶';
+      const sb = document.querySelector('#stagebar [data-act="toggle"]');
+      if (sb) sb.textContent = m.playing ? '❚❚' : '▶';
+    } else if (m.kind === 'tv-error') {
+      flash('Телевизор не смог открыть файл: ' + (m.title || ''), 6000);
+    }
+  };
+}
+
+let tvGuard = null;
+function setTV(on) {
+  tvOpen = on;
+  $('tvChip').classList.toggle('on', on);
+  $('tvChipText').textContent = on ? 'Телевизор подключён' : 'Телевизор не подключён';
+  if (on) { video.muted = true; } else { video.muted = false; remote = { time: 0, duration: 0 }; }
+  drawDeck();
+}
+
+/* ---------- полный экран ---------- */
+function enterStage() {
+  stage.classList.remove('card-mode');
+  stage.classList.add('full-mode');
+  const el = document.documentElement;
+  const rq = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (rq) { try { rq.call(el).catch(() => {}); } catch (e) {} }
+  armChrome();
+}
+function exitStage() {
+  stage.classList.add('card-mode');
+  stage.classList.remove('full-mode', 'hidechrome');
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+}
+let chromeTimer = null;
+function armChrome() {
+  stage.classList.remove('hidechrome');
+  clearTimeout(chromeTimer);
+  chromeTimer = setTimeout(() => {
+    if (stage.classList.contains('full-mode') && !video.paused) stage.classList.add('hidechrome');
+  }, 2600);
+}
+document.addEventListener('mousemove', () => { if (stage.classList.contains('full-mode')) armChrome(); });
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && stage.classList.contains('full-mode')) exitStage();
+});
+
+/* ---------- события интерфейса ---------- */
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const d = b.dataset;
+  if (d.play) { queue.justPlayed = null; play(d.play); }
+  else if (d.add) {
+    queue.push({ qid: uid(), id: d.add, singer: '' });
+    if (!currentId) advance(); else drawQueue();
+    if (currentId) drawDeck();
+  }
+  else if (d.drop) {
+    const t = trackOf(d.drop);
+    library = library.filter((x) => x.id !== d.drop);
+    queue = queue.filter((q) => q.id !== d.drop);
+    blobs.delete(d.drop);
+    if (urls.has(d.drop)) { URL.revokeObjectURL(urls.get(d.drop)); urls.delete(d.drop); }
+    dbDel(d.drop);
+    if (currentId === d.drop) advance();
+    drawLibrary(); drawQueue(); drawDeck();
+    if (t) flash('Убрано из фонотеки: ' + t.title, 2500);
+  }
+  else if (d.up || d.down) {
+    const qid = d.up || d.down;
+    const i = queue.findIndex((q) => q.qid === qid);
+    const j = i + (d.up ? -1 : 1);
+    if (i >= 0 && j >= 0 && j < queue.length) { const [it] = queue.splice(i, 1); queue.splice(j, 0, it); drawQueue(); drawDeck(); }
+  }
+  else if (d.rm) { queue = queue.filter((q) => q.qid !== d.rm); drawQueue(); drawDeck(); }
+  else if (d.act === 'toggle') toggle();
+  else if (d.act === 'next') advance();
+  else if (d.act === 'prevnudge') nudge(-10);
+  else if (d.act === 'nextnudge') nudge(10);
+  else if (d.act === 'exit') exitStage();
+  else if (d.lyr) openSheet(d.lyr);
+});
+
+document.addEventListener('input', (e) => {
+  const qid = e.target.dataset && e.target.dataset.singer;
+  if (!qid) return;
+  const item = queue.find((q) => q.qid === qid);
+  if (item) { item.singer = e.target.value; drawDeck(); if (queue[0] && queue[0].qid === qid) drawQueue0(); }
+});
+function drawQueue0() { // обновить только подпись «следующая», не трогая поле ввода
+  const nxt = queue[0]; if (!nxt) return;
+  const t = trackOf(nxt.id);
+  $('nextName').textContent = (t ? t.title : '') + (nxt.singer ? ' — ' + nxt.singer : '');
+}
+
+$('playBtn').onclick = toggle;
+$('nextBtn').onclick = advance;
+$('againBtn').onclick = () => seekTo(0);
+$('b10').onclick = () => nudge(-10);
+$('f10').onclick = () => nudge(10);
+$('muteBtn').onclick = () => {
+  const m = !(tvOpen ? tvMuted : video.muted);
+  if (tvOpen) { tvMuted = m; push({ kind: 'volume', value: video.volume, muted: m }); }
+  else video.muted = m;
+  $('muteBtn').textContent = m ? '◂' : '◂))';
+};
+let tvMuted = false;
+$('vol').oninput = (e) => {
+  const v = e.target.value / 100;
+  video.volume = v;
+  if (tvOpen) push({ kind: 'volume', value: v, muted: tvMuted });
+};
+$('search').oninput = (e) => { filter = e.target.value; drawLibrary(); };
+$('shuffleBtn').onclick = () => {
+  for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
+  drawQueue(); drawDeck();
+};
+$('clearBtn').onclick = () => { queue = []; drawQueue(); drawDeck(); };
+$('wipeBtn').onclick = async () => {
+  if (!library.length) return;
+  if (!confirm('Убрать все песни из фонотеки? Сами файлы на компьютере останутся.')) return;
+  for (const t of library) { dbDel(t.id); if (urls.has(t.id)) URL.revokeObjectURL(urls.get(t.id)); }
+  library = []; queue = []; blobs.clear(); urls.clear();
+  stopAll(); drawLibrary(); drawQueue();
+};
+$('closeSheet').onclick = closeSheet;
+$('saveLyrics').onclick = async () => {
+  if (!sheetTrackId) return;
+  const data = parseLyrics($('lyricsBox').value);
+  await saveLyrics(sheetTrackId, data);
+  flash(data.lines.length
+    ? (data.synced ? 'Текст с метками времени сохранён' : 'Текст сохранён — осталось разметить его по музыке')
+    : 'Текст удалён', 5000);
+  closeSheet();
+};
+$('dropLyrics').onclick = async () => { if (sheetTrackId) { await saveLyrics(sheetTrackId, null); $('lyricsBox').value = ''; flash('Текст удалён', 3000); } };
+$('startMark').onclick = startMarking;
+$('tapBtn').onclick = tapMark;
+$('undoMark').onclick = undoMark;
+$('finishMark').onclick = finishMarking;
+$('cancelMark').onclick = cancelMarking;
+$('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) closeSheet(); });
+$('vocal').oninput = (e) => {
+  const k = e.target.value / 100;
+  setVocalCut(k);
+  if (tvOpen) push({ kind: 'vocal', value: k });
+};
+$('stageBtn').onclick = enterStage;
+$('tvBtn').onclick = () => {
+  let w = null;
+  try { w = window.open(location.href.split('#')[0] + '#tv', 'karaoke-tv', 'width=1280,height=720'); } catch (e) {}
+  if (!w) flash('Второе окно не открылось — разрешите всплывающие окна, либо нажмите «Во весь экран» и перенесите это окно на телевизор', 8000);
+};
+
+const seek = $('seek');
+seek.addEventListener('pointerdown', () => (scrubbing = true));
+const endScrub = () => {
+  if (!scrubbing) return;
+  scrubbing = false;
+  const d = tvOpen ? remote.duration : (isFinite(video.duration) ? video.duration : 0);
+  if (d) seekTo((seek.value / 1000) * d);
+};
+seek.addEventListener('pointerup', endScrub);
+seek.addEventListener('change', endScrub);
+seek.addEventListener('input', () => {
+  const d = tvOpen ? remote.duration : (isFinite(video.duration) ? video.duration : 0);
+  if (d) $('tNow').textContent = clock((seek.value / 1000) * d);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea')) return;
+  if (marking) { // во время разметки пробел отмечает строку, а не ставит на паузу
+    if (e.code === 'Space') { e.preventDefault(); tapMark(); }
+    else if (e.key === 'Escape') cancelMarking();
+    return;
+  }
+  if ($('sheet').classList.contains('shown') && e.key === 'Escape') { closeSheet(); return; }
+  if (isTV) { // окно телевизора не управляет очередью — только своим видео
+    if (e.code === 'Space') { e.preventDefault(); if (video.paused) video.play().catch(() => {}); else video.pause(); }
+    return;
+  }
+  if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  else if (e.code === 'ArrowRight') nudge(5);
+  else if (e.code === 'ArrowLeft') nudge(-5);
+  else if (e.key === 'n' || e.key === 'N' || e.key === 'т' || e.key === 'Т') advance();
+  else if (e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А') stage.classList.contains('full-mode') ? exitStage() : enterStage();
+  else if (e.key === 'Escape') exitStage();
+});
+
+/* перетаскивание файлов */
+const drop = $('drop');
+$('picker').onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
+drop.onclick = () => $('picker').click();
+['dragenter', 'dragover'].forEach((ev) => window.addEventListener(ev, (e) => { e.preventDefault(); document.body.classList.add('dragging'); }));
+['dragleave', 'drop'].forEach((ev) => window.addEventListener(ev, (e) => {
+  e.preventDefault();
+  if (ev === 'drop' || e.relatedTarget === null) document.body.classList.remove('dragging');
+}));
+window.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer) addFiles(e.dataTransfer.files); });
+drop.addEventListener('dragover', () => drop.classList.add('over'));
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', () => drop.classList.remove('over'));
+
+/* события плеера — только в окне пульта */
+if (!isTV) {
+  video.addEventListener('timeupdate', drawTime);
+  video.addEventListener('durationchange', drawTime);
+  video.addEventListener('play', drawDeck);
+  video.addEventListener('pause', drawDeck);
+  video.addEventListener('ended', () => { if (!tvOpen) advance(); });
+  video.addEventListener('error', () => {
+    if (!currentId || tvOpen) return;
+    const t = trackOf(currentId);
+    if (t) { t.broken = true; drawLibrary(); }
+    flash('Не удалось открыть «' + (t ? t.title : '') + '» — браузер не понимает этот формат', 6000);
+  });
+  stage.addEventListener('click', (e) => {
+    if (e.target.closest('#stagebar')) return;
+    if (stage.classList.contains('full-mode')) toggle();
+  });
+  stage.addEventListener('dblclick', () => stage.classList.contains('full-mode') ? exitStage() : enterStage());
+}
+
+/* ===================== режим телевизора ===================== */
+if (isTV) {
+  document.querySelector('.wrap').style.display = 'none';
+  document.querySelector('.deck').style.display = 'none';
+  document.body.style.background = '#000';
+  document.body.appendChild(stage);
+  stage.classList.remove('card-mode');
+  stage.classList.add('full-mode');
+  document.title = 'Караоке — телевизор';
+  $('idleHint').textContent = 'Управление — в первом окне. Нажмите здесь, чтобы разрешить звук.';
+  const bar = $('stagebar'); if (bar) bar.style.display = 'none';
+
+  let tvCurrent = null, tvTitle = '';
+  const tell = (m) => { if (chan) try { chan.postMessage(m); } catch (e) {} };
+
+  const applyBlob = (blob, at, playing) => {
+    if (!blob) return;
+    $('idle').classList.add('gone');
+    const u = URL.createObjectURL(blob);
+    video.src = u;
+    $('idle').classList.add('gone');
+    if (at) video.addEventListener('loadedmetadata', () => { try { video.currentTime = at; } catch (e) {} }, { once: true });
+    if (playing) video.play().catch(() => flash('Нажмите на экран, чтобы разрешить звук', 6000));
+  };
+
+  chan && (chan.onmessage = async (e) => {
+    const m = e.data || {};
+    if (m.kind === 'load') {
+      if (!m.id) { video.pause(); video.removeAttribute('src'); video.load(); $('idle').classList.remove('gone'); tvCurrent = null; return; }
+      tvCurrent = m.id; tvTitle = m.title || '';
+      stageLyrics = m.lyrics || null;
+      applyStage(m.title || '', !!m.audio);
+      flash('🎤 ' + (m.title || '') + (m.singer ? ' — поёт ' + m.singer : ''), 4200);
+      if (m.blob) applyBlob(m.blob, m.at || 0, m.playing !== false);
+      else {
+        const rec = await dbGet(m.id);
+        if (rec && rec.blob) applyBlob(rec.blob, m.at || 0, m.playing !== false);
+        else tell({ kind: 'tv-need-blob', id: m.id });
+      }
+    }
+    else if (m.kind === 'blob' && m.id === tvCurrent) applyBlob(m.blob, 0, true);
+    else if (m.kind === 'stop') {
+      video.pause(); video.removeAttribute('src'); video.load();
+      $('idle').classList.remove('gone'); tvCurrent = null;
+      stageLyrics = null; applyStage('', false);
+    }
+    else if (m.kind === 'lyrics' && m.id === tvCurrent) { stageLyrics = m.lyrics || null; applyStage(m.title || '', !!m.audio); }
+    else if (m.kind === 'vocal') setVocalCut(m.value || 0);
+    else if (m.kind === 'toggle') { if (video.paused) video.play().catch(() => {}); else video.pause(); }
+    else if (m.kind === 'seek') { try { video.currentTime = m.time; } catch (er) {} }
+    else if (m.kind === 'volume') { video.volume = m.value; video.muted = !!m.muted; }
+  });
+
+  video.addEventListener('play', () => tell({ kind: 'tv-state', playing: true }));
+  video.addEventListener('pause', () => tell({ kind: 'tv-state', playing: false }));
+  video.addEventListener('ended', () => tell({ kind: 'tv-ended' }));
+  video.addEventListener('error', () => tell({ kind: 'tv-error', title: tvTitle }));
+  setInterval(() => {
+    if (!video.src) return;
+    tell({ kind: 'tv-progress', time: video.currentTime || 0, duration: isFinite(video.duration) ? video.duration : 0 });
+  }, 500);
+  document.addEventListener('click', () => { if (video.src && video.paused) video.play().catch(() => {}); });
+  window.addEventListener('pagehide', () => tell({ kind: 'tv-bye' }));
+  tell({ kind: 'tv-hello' });
+}
+
+
+/* =====================================================================
+   Текст песни: разбор, разметка по музыке и показ на сцене.
+   Текст всегда приносит сам пользователь — вставкой или файлом .lrc.
+   ===================================================================== */
+
+const lyricsCache = new Map();   // id -> { lines: [{t, text}], synced }
+let sheetTrackId = null;         // для какой песни открыта панель
+let marking = null;              // состояние разметки
+
+const lyricsOf = (id) => lyricsCache.get(id) || null;
+
+async function loadLyrics(id) {
+  const rec = await dbGet(id, DB.lyr);
+  if (rec && rec.lines && rec.lines.length) {
+    lyricsCache.set(id, { lines: rec.lines, synced: rec.lines.some((l) => l.t != null) });
+    drawLibrary();
+  }
+}
+
+/* Разбирает и обычный текст, и формат .lrc с метками [00:24.10] */
+function parseLyrics(text) {
+  const stampRe = /\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+  const timed = [], plain = [];
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^\[(ti|ar|al|by|re|ve|offset|length):/i.test(line)) continue;
+    const stamps = [...line.matchAll(stampRe)];
+    const body = line.replace(stampRe, '').trim();
+    if (stamps.length) {
+      for (const m of stamps) {
+        const frac = m[3] ? Number((m[3] + '00').slice(0, 3)) / 1000 : 0;
+        timed.push({ t: Number(m[1]) * 60 + Number(m[2]) + frac, text: body });
+      }
+    } else if (body) {
+      plain.push({ t: null, text: body });
+    }
+  }
+  if (timed.length) { timed.sort((a, b) => a.t - b.t); return { lines: timed, synced: true }; }
+  return { lines: plain, synced: false };
+}
+
+async function saveLyrics(id, data) {
+  if (!data || !data.lines.length) { lyricsCache.delete(id); await dbDel(id, DB.lyr); }
+  else { lyricsCache.set(id, data); await dbPut({ id, lines: data.lines }, DB.lyr); }
+  drawLibrary();
+  if (id === currentId) { pushLyrics(); drawStage(); }
+}
+
+/* Файл .lrc или .txt, брошенный на страницу, прикрепляется к подходящей песне */
+async function attachTextFile(file) {
+  const text = await file.text().catch(() => '');
+  if (!text.trim()) return;
+  const base = nameToTitle(file.name).toLowerCase();
+  let target = library.find((t) => t.title.toLowerCase() === base)
+    || library.find((t) => t.title.toLowerCase().includes(base) || base.includes(t.title.toLowerCase()))
+    || trackOf(currentId)
+    || (library.length === 1 ? library[0] : null);
+  if (!target) { flash('Не понял, к какой песне этот текст — откройте песню кнопкой ♪ и вставьте его туда', 7000); return; }
+  const data = parseLyrics(text);
+  if (!data.lines.length) { flash('В файле не нашлось строк текста', 4000); return; }
+  await saveLyrics(target.id, data);
+  flash(data.synced
+    ? 'Текст с метками времени добавлен к «' + target.title + '» — размечать не нужно'
+    : 'Текст добавлен к «' + target.title + '» — теперь разметьте его по музыке', 6000);
+}
+
+/* ---------- панель текста ---------- */
+function openSheet(id) {
+  const t = trackOf(id); if (!t) return;
+  sheetTrackId = id;
+  const cur = lyricsOf(id);
+  $('sheetTitle').textContent = 'Текст песни';
+  $('sheetWho').textContent = t.title;
+  $('lyricsBox').value = cur ? cur.lines.map((l) => l.text).join('\n') : '';
+  $('marker').classList.remove('shown');
+  $('sheetEdit').style.display = '';
+  $('sheet').classList.add('shown');
+  $('lyricsBox').focus();
+}
+function closeSheet() {
+  $('sheet').classList.remove('shown');
+  if (marking) cancelMarking();
+  sheetTrackId = null;
+}
+
+/* ---------- разметка по музыке ---------- */
+async function startMarking() {
+  if (!sheetTrackId) return;
+  if (tvOpen) { flash('Для разметки закройте окно телевизора — нужен звук в этом окне', 6000); return; }
+  const raw = $('lyricsBox').value.trim();
+  if (!raw) { flash('Сначала вставьте текст песни', 4000); return; }
+  const data = parseLyrics(raw);
+  marking = { id: sheetTrackId, lines: data.lines.map((l) => ({ t: null, text: l.text })), i: 0 };
+  $('sheetEdit').style.display = 'none';
+  $('marker').classList.add('shown');
+  drawMarker();
+  if (currentId !== sheetTrackId) await play(sheetTrackId);
+  else { try { video.currentTime = 0; } catch (e) {} video.play().catch(() => {}); }
+}
+function drawMarker() {
+  if (!marking) return;
+  const cur = marking.lines[marking.i];
+  const nxt = marking.lines[marking.i + 1];
+  $('markLine').textContent = cur ? cur.text : 'Все строки размечены';
+  $('markAfter').textContent = nxt ? 'дальше: ' + nxt.text : (cur ? 'это последняя строка' : '');
+  $('markProgress').textContent = 'строка ' + Math.min(marking.i + 1, marking.lines.length) + ' из ' + marking.lines.length;
+}
+function tapMark() {
+  if (!marking) return;
+  const cur = marking.lines[marking.i];
+  if (!cur) { finishMarking(); return; }
+  cur.t = Math.max(0, video.currentTime || 0);
+  marking.i++;
+  drawMarker();
+  if (marking.i >= marking.lines.length) finishMarking();
+}
+function undoMark() {
+  if (!marking || marking.i === 0) return;
+  marking.i--;
+  marking.lines[marking.i].t = null;
+  const back = Math.max(0, (marking.i > 0 ? marking.lines[marking.i - 1].t : 0));
+  try { video.currentTime = back; } catch (e) {}
+  drawMarker();
+}
+async function finishMarking() {
+  if (!marking) return;
+  const stamped = marking.lines.filter((l) => l.t != null);
+  const id = marking.id;
+  marking = null;
+  video.pause();
+  $('marker').classList.remove('shown');
+  $('sheetEdit').style.display = '';
+  if (stamped.length) {
+    await saveLyrics(id, { lines: stamped, synced: true });
+    flash('Готово: размечено строк — ' + stamped.length, 4500);
+    closeSheet();
+  } else {
+    flash('Ни одна строка не отмечена', 4000);
+  }
+}
+function cancelMarking() {
+  marking = null;
+  video.pause();
+  $('marker').classList.remove('shown');
+  $('sheetEdit').style.display = '';
+}
+
+/* ---------- показ текста на сцене ---------- */
+let stageLyrics = null;   // что показывает это окно
+let rafId = null;
+
+function drawStage() {
+  const t = trackOf(currentId);
+  stageLyrics = currentId ? lyricsOf(currentId) : null;
+  applyStage(t ? t.title : '', t ? !!t.audio : false);
+}
+
+/* общая для пульта и телевизора часть */
+function applyStage(title, audioOnly) {
+  const show = !!(stageLyrics && stageLyrics.lines.length) && audioOnly;
+  const box = $('lyricstage');
+  if (!show) {
+    box.classList.remove('shown');
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    return;
+  }
+  $('lyrSong').textContent = title || '';
+  $('lyrHint').textContent = stageLyrics.synced ? '' : 'Текст не размечен по музыке — строки не будут подсвечиваться';
+  box.classList.add('shown');
+  if (!rafId) tick();
+}
+
+function tick() {
+  rafId = requestAnimationFrame(tick);
+  if (!stageLyrics || !$('lyricstage').classList.contains('shown')) return;
+  const lines = stageLyrics.lines;
+  const now = video.currentTime || 0;
+
+  if (!stageLyrics.synced) {
+    $('lyrPrev').textContent = lines[0] ? lines[0].text : '';
+    $('lyrText').textContent = lines[1] ? lines[1].text : '';
+    $('lyrNow').style.setProperty('--p', '0%');
+    $('lyrNext').textContent = lines[2] ? lines[2].text : '';
+    return;
+  }
+
+  let i = -1;
+  for (let k = 0; k < lines.length; k++) { if (now >= lines[k].t) i = k; else break; }
+  const cur = i >= 0 ? lines[i] : null;
+  const nxt = lines[i + 1] || null;
+  const prv = i > 0 ? lines[i - 1] : null;
+
+  $('lyrPrev').textContent = prv ? prv.text : '';
+  $('lyrNext').textContent = nxt ? nxt.text : '';
+  const text = cur ? cur.text : (nxt ? nxt.text : '');
+  if ($('lyrText').textContent !== text) $('lyrText').textContent = text;
+
+  // заполнение строки — как в караоке, слева направо за время её звучания
+  let ratio = 0;
+  if (cur) {
+    const end = nxt ? nxt.t : cur.t + 5;
+    ratio = end > cur.t ? (now - cur.t) / (end - cur.t) : 1;
+  }
+  $('lyrNow').style.setProperty('--p', (Math.max(0, Math.min(1, ratio)) * 100).toFixed(1) + '%');
+
+  // отсчёт перед вступлением: четыре точки за 4 секунды до строки
+  const upcoming = cur ? nxt : lines[0];
+  const gapStart = cur ? (nxt ? nxt.t : null) : (lines[0] ? lines[0].t : null);
+  const dots = $('lyrDots').children;
+  let lit = 0;
+  if (upcoming && gapStart != null) {
+    const left = gapStart - now;
+    const prevEnd = cur ? cur.t : 0;
+    const gap = gapStart - prevEnd;
+    if (left > 0 && left <= 4 && (gap > 2.6 || !cur)) lit = Math.ceil(4 - left);
+  }
+  for (let k = 0; k < dots.length; k++) dots[k].classList.toggle('hot', k < lit);
+  $('lyrDots').style.visibility = lit ? 'visible' : 'hidden';
+}
+
+/* ---------- приглушение вокала ---------- */
+let actx = null, xL = null, xR = null;
+function audioGraph() {
+  if (actx) return true;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    actx = new AC();
+    const src = actx.createMediaElementSource(video);
+    const split = actx.createChannelSplitter(2);
+    const merge = actx.createChannelMerger(2);
+    const dL = actx.createGain(), dR = actx.createGain();
+    xL = actx.createGain(); xR = actx.createGain();
+    xL.gain.value = 0; xR.gain.value = 0;
+    src.connect(split);
+    split.connect(dL, 0); dL.connect(merge, 0, 0);
+    split.connect(dR, 1); dR.connect(merge, 0, 1);
+    split.connect(xL, 1); xL.connect(merge, 0, 0);   // из левого вычитаем правый
+    split.connect(xR, 0); xR.connect(merge, 0, 1);   // и наоборот
+    merge.connect(actx.destination);
+    return true;
+  } catch (e) { actx = null; return false; }
+}
+function setVocalCut(k) {
+  if (!k && !actx) return;             // пока не трогали регулятор — звук идёт напрямую
+  if (!audioGraph()) { flash('Браузер не дал обработать звук', 4000); return; }
+  if (actx.state === 'suspended') actx.resume().catch(() => {});
+  xL.gain.value = -k; xR.gain.value = -k;
+}
+
+/* ---------- запуск ---------- */
+if (!isTV) {
+  drawLibrary(); drawQueue(); drawDeck();
+  loadSaved();
+}
+</script>
+
+</body>
+</html>
